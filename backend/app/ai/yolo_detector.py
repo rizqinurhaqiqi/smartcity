@@ -26,6 +26,7 @@ class YOLODetector:
         self.model = None
         self._load_model()
         self.vehicle_classes = ["car", "motorcycle", "bus", "truck"]
+        # COCO dataset class IDs untuk kendaraan
         self.coco_class_ids = {
             2: "car",
             3: "motorcycle",
@@ -71,15 +72,63 @@ class YOLODetector:
             return result
         except Exception as e:
             logger.error(f"Error detecting vehicles from stream: {str(e)}")
+            return self._get_empty_result()
+
+    async def detect_from_jpeg_bytes(self, jpeg_bytes: bytes) -> Dict:
+        """
+        Deteksi kendaraan dari single JPEG frame (bytes).
+        Digunakan untuk menerima gambar langsung dari ESP32.
+        
+        Args:
+            jpeg_bytes: Raw JPEG image bytes
+            
+        Returns:
+            Dict dengan vehicle_count, car_count, dll.
+        """
+        try:
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(
+                executor,
+                self._process_jpeg_bytes,
+                jpeg_bytes,
+            )
+            return result
+        except Exception as e:
+            logger.error(f"Error detecting from JPEG bytes: {str(e)}")
+            return self._get_empty_result()
+
+    def _process_jpeg_bytes(self, jpeg_bytes: bytes) -> Dict:
+        """
+        Proses single JPEG frame dari bytes (blocking operation).
+        Digunakan untuk gambar yang dikirim ESP32.
+        """
+        try:
+            # Decode JPEG bytes ke numpy array
+            nparr = np.frombuffer(jpeg_bytes, np.uint8)
+            frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+            if frame is None:
+                logger.error("Failed to decode JPEG bytes")
+                return self._get_empty_result()
+
+            detection = self._detect_vehicles_in_frame(frame)
+            vehicles = detection["vehicles"]
+            total_count = detection["total_count"]
+            avg_confidence = detection["avg_confidence"]
+
             return {
-                "vehicle_count": 0,
-                "car_count": 0,
-                "motorcycle_count": 0,
-                "bus_count": 0,
-                "truck_count": 0,
-                "status": "ERROR",
-                "confidence_score": 0.0,
+                "vehicle_count": total_count,
+                "car_count": vehicles["car"],
+                "motorcycle_count": vehicles["motorcycle"],
+                "bus_count": vehicles["bus"],
+                "truck_count": vehicles["truck"],
+                "status": self._determine_status(total_count),
+                "confidence_score": float(avg_confidence),
             }
+
+        except Exception as e:
+            logger.error(f"Error processing JPEG bytes: {str(e)}")
+            return self._get_empty_result()
 
     def _process_stream(self, stream_url: str, frame_interval: int, max_frames: int) -> Dict:
         """Process video stream (blocking operation)"""
@@ -101,7 +150,8 @@ class YOLODetector:
             }
             total_detections = 0
             confidence_sum = 0.0
-            frame_count = 0
+            frame_count = 0         # total frame dibaca
+            processed_count = 0     # frame yang benar-benar diproses YOLO
 
             while frame_count < max_frames:
                 ret, frame = cap.read()
@@ -117,26 +167,26 @@ class YOLODetector:
                     
                     total_detections += detection["total_count"]
                     confidence_sum += detection["avg_confidence"]
+                    processed_count += 1  # hitung frame yang diproses
 
                 frame_count += 1
 
             cap.release()
 
-            # Calculate average
-            avg_confidence = (
-                confidence_sum / frame_count if frame_count > 0 else 0.0
-            )
-            avg_vehicles = (
-                total_detections / frame_count if frame_count > 0 else 0
-            )
+            # FIX: Rata-rata dihitung dari frame yang DIPROSES, bukan total frame
+            if processed_count == 0:
+                return self._get_empty_result()
+
+            avg_confidence = confidence_sum / processed_count
+            avg_vehicles = total_detections / processed_count
 
             return {
-                "vehicle_count": int(avg_vehicles),
-                "car_count": int(total_vehicles["car"] / max(frame_count, 1)),
-                "motorcycle_count": int(total_vehicles["motorcycle"] / max(frame_count, 1)),
-                "bus_count": int(total_vehicles["bus"] / max(frame_count, 1)),
-                "truck_count": int(total_vehicles["truck"] / max(frame_count, 1)),
-                "status": self._determine_status(int(avg_vehicles)),
+                "vehicle_count": int(round(avg_vehicles)),
+                "car_count": int(round(total_vehicles["car"] / processed_count)),
+                "motorcycle_count": int(round(total_vehicles["motorcycle"] / processed_count)),
+                "bus_count": int(round(total_vehicles["bus"] / processed_count)),
+                "truck_count": int(round(total_vehicles["truck"] / processed_count)),
+                "status": self._determine_status(int(round(avg_vehicles))),
                 "confidence_score": float(avg_confidence),
             }
 

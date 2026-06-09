@@ -72,13 +72,18 @@ export const Dashboard = () => {
   const handleSelectCCTV = (cctvId) => {
     const cctv = cctvs.find((c) => c.id === cctvId);
     if (cctv) {
-      console.log('Selected CCTV:', cctv);
-      console.log('Stream URL:', cctv.stream_cctv || cctv.stream_url);
+      // Normalisasi: pastikan stream_url terisi dari stream_cctv jika kosong
+      const normalizedCctv = {
+        ...cctv,
+        stream_url: cctv.stream_url || cctv.stream_cctv || null,
+      };
+      console.log('Selected CCTV:', normalizedCctv);
+      console.log('Stream URL:', normalizedCctv.stream_url);
       setSelectedCCTVId(cctvId);
-      setSelectedCCTV(cctv);
-      setCurrentAnalysis(null); // Reset analysis dulu
-      setAnalysisError(null); // Clear error juga
-      analyzeTraffic(cctvId); // Baru analyze
+      setSelectedCCTV(normalizedCctv);
+      setCurrentAnalysis(null);
+      setAnalysisError(null);
+      analyzeTraffic(cctvId);
     }
   };
 
@@ -178,18 +183,18 @@ export const Dashboard = () => {
             {selectedCCTV && (
               <div className="bg-white rounded-lg shadow-lg p-6">
                 <h2 className="text-xl font-bold mb-4">📹 Live Stream</h2>
-                <div className="bg-black rounded-lg overflow-hidden">
-                  {selectedCCTV.stream_url ? (
+              <div className="bg-black rounded-lg overflow-hidden">
+                  {selectedCCTV.stream_url || selectedCCTV.stream_cctv ? (
                     <VideoStream
-                      streamUrl={`http://localhost:8000/cctv/stream/${selectedCCTV.id}`}
+                      streamUrl={`http://localhost:8000/cctv/stream-manifest/${selectedCCTV.id}`}
                       cctvName={selectedCCTV.cctv_name}
-                      originalUrl={selectedCCTV.stream_url}
+                      originalUrl={selectedCCTV.stream_url || selectedCCTV.stream_cctv}
                     />
                   ) : (
                     <div className="h-64 bg-gray-900 flex items-center justify-center text-gray-400 text-center p-4">
                       <div>
-                        <p className="text-lg mb-2">ℹ️ Tidak ada stream</p>
-                        <p className="text-sm text-gray-500">stream_url field kosong atau undefined</p>
+                        <p className="text-lg mb-2">📹 Stream tidak tersedia</p>
+                        <p className="text-sm text-gray-500">CCTV ini tidak memiliki URL stream</p>
                       </div>
                     </div>
                   )}

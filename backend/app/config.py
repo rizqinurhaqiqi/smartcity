@@ -26,7 +26,15 @@ class Settings:
         "http://localhost:3000",
         "http://127.0.0.1:5173",
         "http://127.0.0.1:3000",
+        # Tambahkan IP jaringan lokal untuk akses dari ESP32 / HP
+        "http://192.168.100.0/24",
+        "*",  # Izinkan semua origin untuk LAN development
     ]
+
+    # ESP32 Config
+    ESP32_IP: str = os.getenv("ESP32_IP", "")          # IP ESP32 (opsional)
+    HP_CAMERA_IP: str = os.getenv("HP_CAMERA_IP", "192.168.100.246")  # IP HP (IP Webcam)
+    HP_CAMERA_PORT: int = int(os.getenv("HP_CAMERA_PORT", 8080))
 
     # AI
     CONFIDENCE_THRESHOLD: float = float(os.getenv("CONFIDENCE_THRESHOLD", 0.5))
