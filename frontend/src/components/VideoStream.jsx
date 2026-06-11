@@ -27,8 +27,12 @@ export const VideoStream = ({ streamUrl, cctvName, originalUrl }) => {
     setIsLoading(true);
 
     try {
-      // Detect stream type from original URL
-      const isHLS = originalUrl?.includes('.m3u8') || originalUrl?.includes('.m3u');
+      // Deteksi tipe stream dari original URL
+      // Stream dari pelindung.bandung.go.id semuanya adalah .m3u8 (HLS)
+      const isHLS =
+        originalUrl?.includes('.m3u8') ||
+        originalUrl?.includes('.m3u') ||
+        streamUrl?.includes('stream-manifest'); // proxy manifest endpoint = HLS
       
       console.log('Stream type - HLS:', isHLS);
 

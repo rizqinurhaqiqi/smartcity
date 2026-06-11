@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
-from app.routes import cctv, analysis, health
+from app.routes import cctv, analysis, health, esp32
 import logging
 
 # Configure logging
@@ -34,6 +34,7 @@ def create_app() -> FastAPI:
     app.include_router(health.router)
     app.include_router(cctv.router)
     app.include_router(analysis.router)
+    app.include_router(esp32.router)
 
     # Root endpoint
     @app.get("/")
